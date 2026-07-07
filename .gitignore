@@ -1,3 +1,6 @@
-# Arquivos de dados locais criados dinamicamente pela CLI
+__pycache__/
+*.pyc
+
 todo.d
 journal.md
+
