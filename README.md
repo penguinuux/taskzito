@@ -94,3 +94,13 @@ Os arquivos gerados são compatíveis com leitores e renderizadores Markdown com
 
 *   Python 3.x
 *   Terminal com suporte a cores ANSI e caracteres Unicode (a maioria dos terminais Linux modernos)
+
+---
+
+## 🧪 Como Rodar os Testes
+
+Você pode validar e garantir a integridade de todas as regras de negócio executando a suíte de testes integrada (desenvolvida com a biblioteca padrão `unittest` do Python):
+
+```bash
+python3 test_taskzito.py
+```
