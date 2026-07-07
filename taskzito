@@ -196,6 +196,36 @@ def delete_todo(index_to_delete):
     print(Style.paint(f"🗑️  Tarefa {index_to_delete} removida do seu todo!", Style.RED))
     print(f"   {Style.paint(removed_text, Style.MUTED, strike=True)}")
 
+def edit_todo(index_to_edit, new_text):
+    """Edita o texto de uma tarefa mantendo seu status e marcador original."""
+    if not new_text.strip():
+        print(Style.paint("❌ Erro: O texto da tarefa não pode ser vazio.", Style.RED))
+        sys.exit(1)
+        
+    lines = read_todo_file()
+    todos = parse_todos(lines)
+    
+    if index_to_edit < 1 or index_to_edit > len(todos):
+        print(Style.paint(f"❌ Erro: Índice {index_to_edit} inválido.", Style.RED))
+        sys.exit(1)
+        
+    target_todo = todos[index_to_edit - 1]
+    line_idx = target_todo['line_idx']
+    marker = target_todo['marker']
+    status_char = 'x' if target_todo['done'] else ' '
+    
+    # Preserva espaços iniciais da linha original para manter indentação markdown
+    original_line = target_todo['original_line']
+    leading_spaces = len(original_line) - len(original_line.lstrip())
+    indent = original_line[:leading_spaces]
+    
+    lines[line_idx] = f"{indent}{marker} [{status_char}] {new_text.strip()}"
+    write_todo_file(lines)
+    
+    print(Style.paint(f"📝 Tarefa {index_to_edit} editada com sucesso!", Style.GREEN))
+    icon = ICON_TODO_DONE if target_todo['done'] else ICON_TODO_PENDING
+    print(f"   {icon}  {Style.paint(new_text.strip(), Style.WHITE, strike=target_todo['done'])}")
+
 
 # ==============================================================================
 # HELPERS PARA JOURNAL (journal.md)
@@ -267,47 +297,128 @@ def highlight_tags(text):
     text = re.sub(r'(?<!\S)#((?!Task\w+|Bug\w+)\w+)', lambda m: Style.paint("#" + m.group(1), Style.BLUE), text, flags=re.IGNORECASE)
     return text
 
+def parse_today_journal():
+    """
+    Lê o journal.md e extrai todas as notas do dia de hoje.
+    Retorna uma lista de dicionários com metadados de cada nota.
+    """
+    if not os.path.exists(JOURNAL_FILE):
+        return []
+    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+        lines = f.read().splitlines()
+        
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    in_today_section = False
+    notes = []
+    
+    for idx, line in enumerate(lines):
+        if line.strip().startswith('# '):
+            date_match = re.match(r'^#\s+(\d{4}-\d{2}-\d{2})', line.strip())
+            if date_match:
+                current_date = date_match.group(1)
+                in_today_section = (current_date == today_str)
+            else:
+                in_today_section = False
+            continue
+            
+        if in_today_section:
+            note_match = re.match(r'^\s*[-*]\s+\[(\d{2}:\d{2}:\d{2})\]\s+(.*)$', line)
+            if note_match:
+                time_str, text = note_match.groups()
+                notes.append({
+                    'line_idx': idx,
+                    'time': time_str,
+                    'text': text.strip(),
+                    'original_line': line
+                })
+    return notes
+
+def edit_journal_note(index_to_edit, new_text):
+    """Edita uma nota do diário de hoje pelo índice de exibição."""
+    if not new_text.strip():
+        print(Style.paint("❌ Erro: O texto da nota não pode estar vazio.", Style.RED))
+        sys.exit(1)
+        
+    if not os.path.exists(JOURNAL_FILE):
+        print(Style.paint("❌ Erro: Nenhum jornal encontrado.", Style.RED))
+        sys.exit(1)
+        
+    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+        lines = f.read().splitlines()
+        
+    notes = parse_today_journal()
+    
+    if index_to_edit < 1 or index_to_edit > len(notes):
+        print(Style.paint(f"❌ Erro: Índice de nota {index_to_edit} inválido para hoje.", Style.RED))
+        sys.exit(1)
+        
+    target_note = notes[index_to_edit - 1]
+    line_idx = target_note['line_idx']
+    time_str = target_note['time']
+    
+    original_line = target_note['original_line']
+    leading_spaces = len(original_line) - len(original_line.lstrip())
+    indent = original_line[:leading_spaces]
+    
+    lines[line_idx] = f"{indent}- [{time_str}] {new_text.strip()}"
+    
+    with open(JOURNAL_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+        
+    print(Style.paint(f"📝 Nota {index_to_edit} do diário editada com sucesso!", Style.GREEN))
+    print(f"   {Style.paint(f'[{time_str}]', Style.MUTED)} {highlight_tags(new_text.strip())}")
+
+def delete_journal_note(index_to_delete):
+    """Remove uma nota do diário de hoje pelo índice de exibição."""
+    if not os.path.exists(JOURNAL_FILE):
+        print(Style.paint("❌ Erro: Nenhum jornal encontrado.", Style.RED))
+        sys.exit(1)
+        
+    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+        lines = f.read().splitlines()
+        
+    notes = parse_today_journal()
+    
+    if index_to_delete < 1 or index_to_delete > len(notes):
+        print(Style.paint(f"❌ Erro: Índice de nota {index_to_delete} inválido para hoje.", Style.RED))
+        sys.exit(1)
+        
+    target_note = notes[index_to_delete - 1]
+    line_idx = target_note['line_idx']
+    removed_text = target_note['text']
+    time_str = target_note['time']
+    
+    lines.pop(line_idx)
+    
+    with open(JOURNAL_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+        
+    print(Style.paint(f"🗑️  Nota {index_to_delete} removida do seu diário!", Style.RED))
+    print(f"   {Style.paint(f'[{time_str}]', Style.MUTED)} {Style.paint(removed_text, Style.MUTED, strike=True)}")
+
 def list_today_journal():
-    """Mostra as notas inseridas hoje no journal."""
+    """Mostra as notas inseridas hoje no journal com índices."""
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     
     print(Style.paint(f"\n📖 {Style.BOLD}NOTAS DO DIÁRIO DE HOJE ({today_str}){Style.RESET}", Style.CYAN))
     print(Style.paint("─" * 50, Style.MUTED))
     
-    if not os.path.exists(JOURNAL_FILE):
+    notes = parse_today_journal()
+    
+    if not notes:
         print(Style.paint("  Nenhuma nota registrada ainda no jornal. Use: taskzito note \"sua nota\"", Style.MUTED))
         print(Style.paint("─" * 50, Style.MUTED))
         return
         
-    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
-        content = f.read()
-        
-    # Vamos extrair apenas a seção de hoje
-    # A seção começa com '# 2026-07-07' e vai até o próximo '#' ou fim do arquivo
-    pattern = rf"(^#\s+{today_str}\s*\n.*?(?=\n#\s|\Z))"
-    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
-    
-    if not match:
-        print(Style.paint("  Nenhuma nota registrada hoje ainda. Use: taskzito note \"sua nota\"", Style.MUTED))
-        print(Style.paint("─" * 50, Style.MUTED))
-        return
-        
-    section = match.group(1)
-    lines = section.splitlines()[1:]  # ignora o header # YYYY-MM-DD
-    
-    has_notes = False
-    for line in lines:
-        if line.strip().startswith('- ['):
-            has_notes = True
-            # Limpa o marcador markdown e colore tags
-            clean_line = line.strip().lstrip('- ').strip()
-            print(f"  {ICON_BULLET} {highlight_tags(clean_line)}")
+    for i, note in enumerate(notes, start=1):
+        idx_str = f"{i:2d}."
+        time_display = Style.paint(f"[{note['time']}]", Style.MUTED)
+        highlighted_note = highlight_tags(note['text'])
+        print(f"  {Style.paint(idx_str, Style.PURPLE)} {time_display} {highlighted_note}")
             
-    if not has_notes:
-        print(Style.paint("  Seção do dia criada, mas sem notas registradas.", Style.MUTED))
-        
     print(Style.paint("─" * 50, Style.MUTED))
+    print(Style.paint(f"  💡 Use 'taskzito note edit <numero> \"novo texto\"' para editar ou 'del <numero>' para remover.", Style.MUTED))
 
 
 # ==============================================================================
@@ -545,6 +656,15 @@ def main():
                     toggle_todo(idx)
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            elif sub == 'edit':
+                if len(sys.argv) < 5:
+                    print(Style.paint("❌ Erro: Especifique o índice e o novo texto da tarefa.", Style.RED))
+                    sys.exit(1)
+                try:
+                    idx = int(sys.argv[3])
+                    edit_todo(idx, " ".join(sys.argv[4:]))
+                except ValueError:
+                    print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             elif sub in ('del', 'delete', 'remove'):
                 if len(sys.argv) < 4:
                     print(Style.paint("❌ Erro: Especifique o índice para remover.", Style.RED))
@@ -566,6 +686,16 @@ def main():
             sys.exit(1)
         add_todo(" ".join(sys.argv[2:]))
         
+    elif command == 'edit':
+        if len(sys.argv) < 4:
+            print(Style.paint("❌ Erro: Informe o número da tarefa e o novo texto.", Style.RED))
+            sys.exit(1)
+        try:
+            idx = int(sys.argv[2])
+            edit_todo(idx, " ".join(sys.argv[3:]))
+        except ValueError:
+            print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+
     elif command in ('toggle', 'check', 'uncheck', 'tk'):
         if len(sys.argv) < 3:
             print(Style.paint("❌ Erro: Informe o número da tarefa.", Style.RED))
@@ -587,11 +717,30 @@ def main():
             print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             
     elif command in ('note', 'n', 'journal', 'j'):
-        if len(sys.argv) < 3:
-            # Se chamou sem texto, exibe as notas do jornal de hoje
-            list_today_journal()
+        if len(sys.argv) > 2:
+            sub = sys.argv[2].lower()
+            if sub == 'edit':
+                if len(sys.argv) < 5:
+                    print(Style.paint("❌ Erro: Especifique o índice e o novo texto da nota.", Style.RED))
+                    sys.exit(1)
+                try:
+                    idx = int(sys.argv[3])
+                    edit_journal_note(idx, " ".join(sys.argv[4:]))
+                except ValueError:
+                    print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            elif sub in ('del', 'delete', 'remove'):
+                if len(sys.argv) < 4:
+                    print(Style.paint("❌ Erro: Especifique o índice da nota para remover.", Style.RED))
+                    sys.exit(1)
+                try:
+                    idx = int(sys.argv[3])
+                    delete_journal_note(idx)
+                except ValueError:
+                    print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            else:
+                add_journal_note(" ".join(sys.argv[2:]))
         else:
-            add_journal_note(" ".join(sys.argv[2:]))
+            list_today_journal()
             
     elif command in ('view', 'today'):
         list_today_journal()

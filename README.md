@@ -29,6 +29,10 @@ O **Taskzito** é um jornal markdown minimalista e gerenciador de to-do list CLI
     ```bash
     ./taskzito add "Minha nova tarefa"
     ```
+*   **Editar o texto de uma tarefa**:
+    ```bash
+    ./taskzito edit <numero_da_tarefa> "Novo texto da tarefa"
+    ```
 *   **Alternar status de uma tarefa (Toggle [ ] <-> [x])**:
     ```bash
     ./taskzito toggle <numero_da_tarefa>
@@ -46,9 +50,17 @@ O **Taskzito** é um jornal markdown minimalista e gerenciador de to-do list CLI
     ```bash
     ./taskzito note "Implementando a rota de login #Task42282"
     ```
-*   **Visualizar as notas do diário registradas hoje**:
+*   **Visualizar as notas do diário registradas hoje (com índices)**:
     ```bash
     ./taskzito view
+    ```
+*   **Editar uma nota registrada hoje**:
+    ```bash
+    ./taskzito note edit <numero_da_nota> "Novo texto da nota"
+    ```
+*   **Remover uma nota registrada hoje**:
+    ```bash
+    ./taskzito note del <numero_da_nota>
     ```
 
 ### 📊 Relatórios

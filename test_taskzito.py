@@ -136,6 +136,18 @@ class TestTaskzito(unittest.TestCase):
         self.assertEqual(todos[0]['text'], "Tarefa 1")
         self.assertEqual(todos[1]['text'], "Tarefa 3")
 
+    def test_edit_todo(self):
+        """Testa se o texto de uma tarefa é editado mantendo o status."""
+        taskzito.ensure_files_exist()
+        taskzito.add_todo("Tarefa Antiga")
+        
+        # Edita a tarefa 1
+        taskzito.edit_todo(1, "Tarefa Nova Atualizada")
+        
+        todos = taskzito.parse_todos(taskzito.read_todo_file())
+        self.assertEqual(todos[0]['text'], "Tarefa Nova Atualizada")
+        self.assertFalse(todos[0]['done'])
+
     # --------------------------------------------------------------------------
     # TESTES DO JORNAL (journal.md)
     # --------------------------------------------------------------------------
@@ -158,6 +170,31 @@ class TestTaskzito(unittest.TestCase):
         self.assertIn("Corrigindo bug na migration #Bug202", content)
         # Verifica se contém formato de timestamp [- [HH:MM:SS]]
         self.assertTrue(re.search(r'- \[\d{2}:\d{2}:\d{2}\]', content))
+
+    def test_edit_journal_note(self):
+        """Testa a edição de notas do diário de hoje."""
+        taskzito.ensure_files_exist()
+        taskzito.add_journal_note("Nota antiga")
+        
+        # Edita a nota 1
+        taskzito.edit_journal_note(1, "Nota atualizada e corrigida")
+        
+        notes = taskzito.parse_today_journal()
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]['text'], "Nota atualizada e corrigida")
+
+    def test_delete_journal_note(self):
+        """Testa a deleção de notas do diário de hoje."""
+        taskzito.ensure_files_exist()
+        taskzito.add_journal_note("Nota a ser mantida")
+        taskzito.add_journal_note("Nota a ser deletada")
+        
+        # Deleta a nota 2
+        taskzito.delete_journal_note(2)
+        
+        notes = taskzito.parse_today_journal()
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]['text'], "Nota a ser mantida")
 
     # --------------------------------------------------------------------------
     # TESTES DE RELATÓRIO (report / report -s)
