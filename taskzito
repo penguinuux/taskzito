@@ -1,0 +1,613 @@
+#!/usr/bin/env python3
+import os
+import sys
+import re
+from datetime import datetime
+
+# ==============================================================================
+# DESIGN SYSTEM & COLOR PALETTE
+# ==============================================================================
+class Style:
+    # Cores ANSI de 256 bits para visual moderno e vibrante
+    PURPLE = '\033[38;5;141m'    # Roxo pastel
+    CYAN = '\033[38;5;81m'       # Ciano neon
+    GREEN = '\033[38;5;120m'     # Verde vibrante
+    YELLOW = '\033[38;5;222m'    # Amarelo/Laranja suave
+    RED = '\033[38;5;204m'       # Vermelho/Rosa neon
+    BLUE = '\033[38;5;39m'       # Azul elétrico
+    MUTED = '\033[38;5;244m'      # Cinza escuro (para textos secundários)
+    WHITE = '\033[38;5;255m'     # Branco puro
+    
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    STRIKETHROUGH = '\033[9m'    # Para tarefas concluídas
+    RESET = '\033[0m'
+    
+    @classmethod
+    def paint(cls, text, color, bold=False, strike=False):
+        style_codes = color
+        if bold:
+            style_codes += cls.BOLD
+        if strike:
+            style_codes += cls.STRIKETHROUGH
+        return f"{style_codes}{text}{cls.RESET}"
+
+# Ícones unicode modernos
+ICON_TODO_PENDING = "⬜"
+ICON_TODO_DONE = "✅"
+ICON_JOURNAL = "📝"
+ICON_TIME = "🕒"
+ICON_CALENDAR = "📅"
+ICON_TASK = "⚡"
+ICON_BUG = "🐛"
+ICON_REPORT = "📊"
+ICON_BULLET = "▪"
+
+TODO_FILE = "todo.d"
+JOURNAL_FILE = "journal.md"
+
+def ensure_files_exist():
+    """Garante que os arquivos de dados (todo.d e journal.md) existam."""
+    if not os.path.exists(TODO_FILE):
+        with open(TODO_FILE, 'w', encoding='utf-8') as f:
+            f.write("")
+    if not os.path.exists(JOURNAL_FILE):
+        with open(JOURNAL_FILE, 'w', encoding='utf-8') as f:
+            f.write("")
+
+
+# ==============================================================================
+# HELPERS PARA TODO LIST (todo.d)
+# ==============================================================================
+def read_todo_file():
+    """Lê o arquivo todo.d e retorna a lista de linhas."""
+    if not os.path.exists(TODO_FILE):
+        return []
+    with open(TODO_FILE, 'r', encoding='utf-8') as f:
+        return f.read().splitlines()
+
+def write_todo_file(lines):
+    """Escreve as linhas de volta no arquivo todo.d."""
+    with open(TODO_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+
+def parse_todos(lines):
+    """
+    Identifica quais linhas correspondem a tarefas markdown (- [ ] ou - [x]).
+    Retorna uma lista de dicionários com metadados de cada tarefa encontrada:
+    { 'index': idx_no_arquivo, 'done': bool, 'text': 'texto da tarefa', 'original_line': 'linha original' }
+    """
+    todos = []
+    # Expressão regular para capturar itens markdown como - [ ] Tarefa ou - [x] Tarefa
+    todo_pattern = re.compile(r'^(\s*[-*]|\d+\.)\s+\[([ xX])\]\s+(.*)$')
+    
+    for idx, line in enumerate(lines):
+        match = todo_pattern.match(line)
+        if match:
+            marker, status_char, text = match.groups()
+            done = status_char.lower() == 'x'
+            todos.append({
+                'line_idx': idx,
+                'done': done,
+                'text': text.strip(),
+                'marker': marker,
+                'original_line': line
+            })
+    return todos
+
+def list_todos():
+    """Exibe a lista de tarefas formatada e com índices."""
+    print(Style.paint(f"\n🎯 {Style.BOLD}SUAS TAREFAS EM {TODO_FILE}{Style.RESET}", Style.CYAN))
+    print(Style.paint("─" * 50, Style.MUTED))
+    
+    lines = read_todo_file()
+    todos = parse_todos(lines)
+    
+    if not todos:
+        print(Style.paint("  Nenhuma tarefa encontrada! Adicione com: taskzito add \"sua tarefa\"", Style.MUTED))
+        print(Style.paint("─" * 50, Style.MUTED))
+        return
+        
+    for i, todo in enumerate(todos, start=1):
+        idx_str = f"{i:2d}."
+        if todo['done']:
+            status_icon = ICON_TODO_DONE
+            todo_text = Style.paint(todo['text'], Style.MUTED, strike=True)
+            display_line = f"  {Style.paint(idx_str, Style.MUTED)} {status_icon}  {todo_text}"
+        else:
+            status_icon = ICON_TODO_PENDING
+            todo_text = Style.paint(todo['text'], Style.WHITE, bold=True)
+            display_line = f"  {Style.paint(idx_str, Style.PURPLE)} {status_icon}  {todo_text}"
+        print(display_line)
+        
+    print(Style.paint("─" * 50, Style.MUTED))
+    print(Style.paint(f"  💡 Use 'taskzito toggle <numero>' para marcar/desmarcar.", Style.MUTED))
+
+def add_todo(task_text):
+    """Adiciona uma nova tarefa ao final do arquivo todo.d."""
+    if not task_text.strip():
+        print(Style.paint("❌ Erro: O texto da tarefa não pode ser vazio.", Style.RED))
+        sys.exit(1)
+        
+    new_line = f"- [ ] {task_text.strip()}"
+    lines = read_todo_file()
+    
+    # Adiciona uma quebra de linha se necessário
+    lines.append(new_line)
+    write_todo_file(lines)
+    
+    print(Style.paint(f"✨ Tarefa adicionada com sucesso!", Style.GREEN))
+    print(f"   {ICON_TODO_PENDING}  {Style.paint(task_text.strip(), Style.WHITE, bold=True)}")
+
+def toggle_todo(index_to_toggle):
+    """Altera o status de uma tarefa (concluída <-> pendente) pelo índice visível."""
+    lines = read_todo_file()
+    todos = parse_todos(lines)
+    
+    if index_to_toggle < 1 or index_to_toggle > len(todos):
+        print(Style.paint(f"❌ Erro: Índice {index_to_toggle} inválido. Veja as tarefas com 'taskzito todo'", Style.RED))
+        sys.exit(1)
+        
+    # Pega o mapeamento da tarefa no arquivo original
+    target_todo = todos[index_to_toggle - 1]
+    line_idx = target_todo['line_idx']
+    
+    # Inverte o status
+    new_status_char = ' ' if target_todo['done'] else 'x'
+    # Reconstrói a linha preservando a indentação e o marcador original
+    marker = target_todo['marker']
+    text = target_todo['text']
+    
+    # Preserva espaços iniciais da linha original para manter indentação markdown
+    original_line = target_todo['original_line']
+    leading_spaces = len(original_line) - len(original_line.lstrip())
+    indent = original_line[:leading_spaces]
+    
+    lines[line_idx] = f"{indent}{marker} [{new_status_char}] {text}"
+    write_todo_file(lines)
+    
+    status_msg = "concluída" if new_status_char == 'x' else "marcada como pendente"
+    color = Style.GREEN if new_status_char == 'x' else Style.YELLOW
+    icon = ICON_TODO_DONE if new_status_char == 'x' else ICON_TODO_PENDING
+    
+    print(Style.paint(f"🔄 Tarefa {index_to_toggle} {status_msg}!", color))
+    print(f"   {icon}  {Style.paint(text, Style.WHITE, strike=(new_status_char == 'x'))}")
+
+def delete_todo(index_to_delete):
+    """Remove uma tarefa do arquivo todo.d pelo índice visível."""
+    lines = read_todo_file()
+    todos = parse_todos(lines)
+    
+    if index_to_delete < 1 or index_to_delete > len(todos):
+        print(Style.paint(f"❌ Erro: Índice {index_to_delete} inválido.", Style.RED))
+        sys.exit(1)
+        
+    target_todo = todos[index_to_delete - 1]
+    line_idx = target_todo['line_idx']
+    
+    # Remove a linha
+    removed_text = target_todo['text']
+    lines.pop(line_idx)
+    write_todo_file(lines)
+    
+    print(Style.paint(f"🗑️  Tarefa {index_to_delete} removida do seu todo!", Style.RED))
+    print(f"   {Style.paint(removed_text, Style.MUTED, strike=True)}")
+
+
+# ==============================================================================
+# HELPERS PARA JOURNAL (journal.md)
+# ==============================================================================
+def add_journal_note(note_text):
+    """Anexa uma nota de texto temporal com timestamp no dia atual."""
+    if not note_text.strip():
+        print(Style.paint("❌ Erro: A nota não pode estar vazia.", Style.RED))
+        sys.exit(1)
+        
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H:%M:%S")
+    
+    note_content = note_text.strip()
+    
+    # Lê conteúdo atual do jornal para verificação
+    content = ""
+    if os.path.exists(JOURNAL_FILE):
+        with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+    header_today = f"# {today_str}"
+    
+    # Verifica se a seção de hoje já existe no arquivo
+    # Uma forma limpa é verificar se o arquivo termina com a seção do dia de hoje
+    # ou se ela já foi definida em algum ponto
+    new_entry = f"- [{time_str}] {note_content}"
+    
+    # Se o arquivo estiver vazio
+    if not content.strip():
+        updated_content = f"{header_today}\n\n{new_entry}\n"
+    else:
+        # Se o header de hoje já existe, apenas adicionamos a nota no final do dia
+        # Para evitar problemas se o usuário adicionar notas antigas de forma manual,
+        # vamos verificar se a última ocorrência de `# YYYY-MM-DD` é de hoje.
+        headers = re.findall(r'^#\s+(\d{4}-\d{2}-\d{2})', content, re.MULTILINE)
+        
+        if headers and headers[-1] == today_str:
+            # O dia atual é o último do jornal. Apenas anexamos
+            # Garante que termine com nova linha para formatar bem
+            if not content.endswith('\n'):
+                content += '\n'
+            updated_content = f"{content}{new_entry}\n"
+        else:
+            # O dia atual ainda não foi criado ou o arquivo está desordenado.
+            # Adicionamos uma nova seção de dia ao final
+            if not content.endswith('\n'):
+                content += '\n'
+            if content.strip():
+                updated_content = f"{content}\n{header_today}\n\n{new_entry}\n"
+            else:
+                updated_content = f"{header_today}\n\n{new_entry}\n"
+                
+    with open(JOURNAL_FILE, 'w', encoding='utf-8') as f:
+        f.write(updated_content)
+        
+    # Destaca tags encontradas na nota na hora de exibir confirmação
+    highlighted_note = highlight_tags(new_entry)
+    print(Style.paint(f"📝 Nota registrada no jornal com sucesso!", Style.GREEN))
+    print(f"   {highlighted_note}")
+
+def highlight_tags(text):
+    """Pinta as hashtags de Task e Bug com cores vibrantes para exibição no terminal."""
+    # Colore #Task123 de Roxo e #Bug123 de Vermelho
+    text = re.sub(r'(#Task\w+)', lambda m: Style.paint(m.group(1), Style.PURPLE, bold=True), text, flags=re.IGNORECASE)
+    text = re.sub(r'(#Bug\w+)', lambda m: Style.paint(m.group(1), Style.RED, bold=True), text, flags=re.IGNORECASE)
+    # Colore outras hashtags gerais se existirem de azul
+    text = re.sub(r'(?<!\S)#((?!Task\w+|Bug\w+)\w+)', lambda m: Style.paint("#" + m.group(1), Style.BLUE), text, flags=re.IGNORECASE)
+    return text
+
+def list_today_journal():
+    """Mostra as notas inseridas hoje no journal."""
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    
+    print(Style.paint(f"\n📖 {Style.BOLD}NOTAS DO DIÁRIO DE HOJE ({today_str}){Style.RESET}", Style.CYAN))
+    print(Style.paint("─" * 50, Style.MUTED))
+    
+    if not os.path.exists(JOURNAL_FILE):
+        print(Style.paint("  Nenhuma nota registrada ainda no jornal. Use: taskzito note \"sua nota\"", Style.MUTED))
+        print(Style.paint("─" * 50, Style.MUTED))
+        return
+        
+    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+        content = f.read()
+        
+    # Vamos extrair apenas a seção de hoje
+    # A seção começa com '# 2026-07-07' e vai até o próximo '#' ou fim do arquivo
+    pattern = rf"(^#\s+{today_str}\s*\n.*?(?=\n#\s|\Z))"
+    match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+    
+    if not match:
+        print(Style.paint("  Nenhuma nota registrada hoje ainda. Use: taskzito note \"sua nota\"", Style.MUTED))
+        print(Style.paint("─" * 50, Style.MUTED))
+        return
+        
+    section = match.group(1)
+    lines = section.splitlines()[1:]  # ignora o header # YYYY-MM-DD
+    
+    has_notes = False
+    for line in lines:
+        if line.strip().startswith('- ['):
+            has_notes = True
+            # Limpa o marcador markdown e colore tags
+            clean_line = line.strip().lstrip('- ').strip()
+            print(f"  {ICON_BULLET} {highlight_tags(clean_line)}")
+            
+    if not has_notes:
+        print(Style.paint("  Seção do dia criada, mas sem notas registradas.", Style.MUTED))
+        
+    print(Style.paint("─" * 50, Style.MUTED))
+
+
+# ==============================================================================
+# REPORTING ENGINE (Relatório por dia e tags)
+# ==============================================================================
+def parse_journal_for_report():
+    """
+    Lê o journal.md e extrai todas as tags do tipo #Task e #Bug.
+    Retorna uma estrutura organizada:
+    {
+       'YYYY-MM-DD': {
+           '#Task12345': [ (timestamp, nota_completa), ... ],
+           '#Bug999': [ ... ]
+       }
+    }
+    """
+    if not os.path.exists(JOURNAL_FILE):
+        return {}
+        
+    with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+        content = f.read()
+        
+    report_data = {}
+    
+    # Divide o arquivo em seções por dia
+    # Cada seção começa com um cabeçalho `# YYYY-MM-DD`
+    day_sections = re.split(r'^#\s+(\d{4}-\d{2}-\d{2})', content, flags=re.MULTILINE)
+    
+    # O primeiro elemento é o que vem antes do primeiro header (normalmente vazio ou cabeçalho do arquivo)
+    # Depois, os elementos vêm em pares: (data, texto da seção)
+    if len(day_sections) > 1:
+        for i in range(1, len(day_sections), 2):
+            date_str = day_sections[i].strip()
+            section_text = day_sections[i+1]
+            
+            # Procura linhas com o padrão de notas do diário: - [HH:MM:SS] Texto da nota
+            note_lines = re.findall(r'^\s*[-*]\s+\[(\d{2}:\d{2}:\d{2})\]\s+(.*)$', section_text, re.MULTILINE)
+            
+            for timestamp, note_text in note_lines:
+                # Procura por todas as hashtags de Tasks e Bugs
+                # Captura tags case-insensitive, mas as padroniza para visualização limpa
+                tags = re.findall(r'#(Task\w+|Bug\w+)', note_text, re.IGNORECASE)
+                
+                for tag in tags:
+                    # Normaliza a grafia para manter consistência no agrupamento (ex: #Task42282 -> #Task42282)
+                    # Mantém o caso original do usuário, mas capitaliza a primeira letra de Task/Bug
+                    tag_type = "Task" if tag.lower().startswith("task") else "Bug"
+                    tag_id = tag[len(tag_type):]
+                    normalized_tag = f"#{tag_type}{tag_id}"
+                    
+                    if date_str not in report_data:
+                        report_data[date_str] = {}
+                    if normalized_tag not in report_data[date_str]:
+                        report_data[date_str][normalized_tag] = []
+                        
+                    # Remove a própria hashtag do texto para não ficar redundante no relatório,
+                    # ou mantém para clareza? Geralmente, tirar a hashtag que já é o título do grupo
+                    # deixa o relatório muito mais limpo e premium. Vamos manter o texto mas
+                    # pintar o timestamp.
+                    report_data[date_str][normalized_tag].append((timestamp, note_text.strip()))
+                    
+    return report_data
+
+def generate_report(simple=False):
+    """Gera e exibe um relatório de tasks e bugs resolvidos por dia."""
+    report_data = parse_journal_for_report()
+    
+    if not report_data:
+        if simple:
+            print("Nenhum registro de #Task ou #Bug encontrado.")
+        else:
+            print(Style.paint(f"\n{ICON_REPORT} {Style.BOLD}RELATÓRIO DE TASKS E BUGS EXECUTADOS{Style.RESET}", Style.CYAN))
+            print(Style.paint("═" * 60, Style.CYAN))
+            print(Style.paint("  Nenhum registro de #Task ou #Bug encontrado em seu jornal.", Style.MUTED))
+            print(Style.paint("  Para gerar um relatório, marque suas notas no diário. Exemplo:", Style.MUTED))
+            print(Style.paint(f"  taskzito note \"Finalizado o setup do banco de dados #Task42282\"", Style.YELLOW))
+            print(Style.paint("═" * 60, Style.CYAN))
+        return
+        
+    sorted_dates = sorted(report_data.keys())
+    
+    if simple:
+        for date_str in sorted_dates:
+            tags_dict = report_data[date_str]
+            sorted_tags = sorted(tags_dict.keys(), key=lambda t: (0 if "Task" in t else 1, t))
+            tags_str = ", ".join(sorted_tags)
+            print(f"{date_str}: {tags_str}")
+    else:
+        print(Style.paint(f"\n{ICON_REPORT} {Style.BOLD}RELATÓRIO DE TASKS E BUGS EXECUTADOS{Style.RESET}", Style.CYAN))
+        print(Style.paint("═" * 60, Style.CYAN))
+        
+        for date_str in sorted_dates:
+            print(f"\n{ICON_CALENDAR} {Style.paint(date_str, Style.WHITE, bold=True)}")
+            print(Style.paint("  " + "─" * 45, Style.MUTED))
+            
+            tags_dict = report_data[date_str]
+            sorted_tags = sorted(tags_dict.keys(), key=lambda t: (0 if "Task" in t else 1, t))
+            
+            for tag in sorted_tags:
+                is_bug = "Bug" in tag
+                tag_color = Style.RED if is_bug else Style.PURPLE
+                tag_icon = ICON_BUG if is_bug else ICON_TASK
+                
+                print(f"    {tag_icon} {Style.paint(tag, tag_color, bold=True)}")
+                
+                for timestamp, note_text in tags_dict[tag]:
+                    time_display = Style.paint(f"[{timestamp}]", Style.MUTED)
+                    highlighted_note = highlight_tags(note_text)
+                    print(f"      {ICON_TIME} {time_display} {highlighted_note}")
+            print()
+            
+        print(Style.paint("═" * 60, Style.CYAN))
+
+
+# ==============================================================================
+# DASHBOARD (Interface de Entrada Padrão)
+# ==============================================================================
+def show_dashboard():
+    """Exibe um painel de controle premium consolidando o status de hoje."""
+    now = datetime.now()
+    date_display = now.strftime("%A, %d de %B de %Y - %H:%M:%S")
+    # Traduz dia da semana de forma simples se possível (opcional, mantendo portabilidade rápida)
+    weekdays_pt = {
+        "Monday": "Segunda-feira", "Tuesday": "Terça-feira", "Wednesday": "Quarta-feira",
+        "Thursday": "Quinta-feira", "Friday": "Sexta-feira", "Saturday": "Sábado", "Sunday": "Domingo"
+    }
+    months_pt = {
+        "January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril",
+        "May": "Maio", "June": "Junho", "July": "Julho", "August": "Agosto",
+        "September": "Setembro", "October": "Outubro", "November": "Novembro", "December": "Dezembro"
+    }
+    
+    eng_weekday = now.strftime("%A")
+    eng_month = now.strftime("%B")
+    
+    pt_weekday = weekdays_pt.get(eng_weekday, eng_weekday)
+    pt_month = months_pt.get(eng_month, eng_month)
+    date_display = f"{pt_weekday}, {now.day} de {pt_month} de {now.year}"
+    
+    print("\n" + Style.paint("  ⚡  TASKZITO  ⚡  ", Style.PURPLE, bold=True).center(68))
+    print(Style.paint("Minimalist Markdown Journal & To-Do CLI", Style.MUTED).center(68))
+    print(Style.paint(f"📅 {date_display}", Style.CYAN).center(68))
+    print(Style.paint("─" * 60, Style.MUTED).center(68))
+    
+    # 1. Resumo das Tarefas
+    lines = read_todo_file()
+    todos = parse_todos(lines)
+    total_todos = len(todos)
+    done_todos = sum(1 for t in todos if t['done'])
+    pending_todos = total_todos - done_todos
+    
+    todo_summary = f"🎯 Todo List: {pending_todos} pendentes | {done_todos} concluídas"
+    print(Style.paint(f"  {todo_summary}", Style.WHITE, bold=True))
+    
+    # Exibe as primeiras 3 tarefas pendentes se houver
+    if pending_todos > 0:
+        pendings = [t for t in todos if not t['done']][:3]
+        for t in pendings:
+            # Encontra o índice visível
+            idx = todos.index(t) + 1
+            print(f"     {Style.paint(f'{idx}.', Style.PURPLE)} {ICON_TODO_PENDING} {t['text']}")
+        if pending_todos > 3:
+            print(Style.paint(f"     ... e mais {pending_todos - 3} tarefas pendentes. Digite 'taskzito todo'", Style.MUTED))
+    elif total_todos > 0:
+        print(Style.paint("     🎉 Todas as tarefas concluídas!", Style.GREEN))
+    else:
+        print(Style.paint("     Nenhuma tarefa cadastrada. Adicione uma tarefa!", Style.MUTED))
+        
+    print()
+    
+    # 2. Resumo do Diário de Hoje
+    print(Style.paint(f"  {ICON_JOURNAL} Journal de Hoje:", Style.WHITE, bold=True))
+    today_str = now.strftime("%Y-%m-%d")
+    
+    has_journal_today = False
+    if os.path.exists(JOURNAL_FILE):
+        with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        pattern = rf"(^#\s+{today_str}\s*\n.*?(?=\n#\s|\Z))"
+        match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+        if match:
+            section = match.group(1)
+            journal_lines = [l.strip().lstrip('- ').strip() for l in section.splitlines() if l.strip().startswith('- [')]
+            if journal_lines:
+                has_journal_today = True
+                # Exibe as últimas 3 notas de hoje
+                for line in journal_lines[-3:]:
+                    print(f"     {ICON_BULLET} {highlight_tags(line)}")
+                if len(journal_lines) > 3:
+                    print(Style.paint(f"     ... e mais {len(journal_lines) - 3} notas hoje. Digite 'taskzito view'", Style.MUTED))
+                    
+    if not has_journal_today:
+        print(Style.paint("     Nenhuma nota anotada hoje. Registre seu dia!", Style.MUTED))
+        
+    print(Style.paint("─" * 60, Style.MUTED).center(68))
+    
+    # 3. Quick Help Menu
+    print(Style.paint("🚀 COMANDOS RÁPIDOS:", Style.CYAN))
+    print(f"  {Style.paint('taskzito todo', Style.PURPLE, bold=True):<25} {Style.paint('Lista todas as tarefas', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito add <tarefa>', Style.PURPLE, bold=True):<25} {Style.paint('Adiciona uma tarefa no todo.d', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito toggle <id>', Style.PURPLE, bold=True):<25} {Style.paint('Marca/desmarca uma tarefa', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito del <id>', Style.PURPLE, bold=True):<25} {Style.paint('Remove uma tarefa', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito note <texto>', Style.BLUE, bold=True):<25} {Style.paint('Escreve uma nota no jornal de hoje', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito view', Style.BLUE, bold=True):<25} {Style.paint('Exibe o jornal do dia', Style.MUTED)}")
+    print(f"  {Style.paint('taskzito report', Style.CYAN, bold=True):<25} {Style.paint('Exibe relatório de #Task e #Bug por dia', Style.MUTED)}")
+    print(Style.paint("─" * 60, Style.MUTED).center(68))
+
+
+# ==============================================================================
+# MAIN ROUTING
+# ==============================================================================
+def main():
+    ensure_files_exist()
+    if len(sys.argv) < 2:
+        show_dashboard()
+        return
+
+    command = sys.argv[1].lower()
+
+    if command in ('help', '-h', '--help'):
+        show_dashboard()
+        
+    elif command in ('todo', 't', 'list'):
+        # Se houver subcomando para todo (ex: taskzito todo add "..." ou taskzito todo toggle 1)
+        if len(sys.argv) > 2:
+            sub = sys.argv[2].lower()
+            if sub == 'add':
+                add_todo(" ".join(sys.argv[3:]))
+            elif sub == 'toggle':
+                if len(sys.argv) < 4:
+                    print(Style.paint("❌ Erro: Especifique o índice para fazer o toggle.", Style.RED))
+                    sys.exit(1)
+                try:
+                    idx = int(sys.argv[3])
+                    toggle_todo(idx)
+                except ValueError:
+                    print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            elif sub in ('del', 'delete', 'remove'):
+                if len(sys.argv) < 4:
+                    print(Style.paint("❌ Erro: Especifique o índice para remover.", Style.RED))
+                    sys.exit(1)
+                try:
+                    idx = int(sys.argv[3])
+                    delete_todo(idx)
+                except ValueError:
+                    print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            else:
+                # Trata tudo após o comando como a adição de uma tarefa
+                add_todo(" ".join(sys.argv[2:]))
+        else:
+            list_todos()
+            
+    elif command == 'add':
+        if len(sys.argv) < 3:
+            print(Style.paint("❌ Erro: Informe o texto da tarefa.", Style.RED))
+            sys.exit(1)
+        add_todo(" ".join(sys.argv[2:]))
+        
+    elif command in ('toggle', 'check', 'uncheck', 'tk'):
+        if len(sys.argv) < 3:
+            print(Style.paint("❌ Erro: Informe o número da tarefa.", Style.RED))
+            sys.exit(1)
+        try:
+            idx = int(sys.argv[2])
+            toggle_todo(idx)
+        except ValueError:
+            print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            
+    elif command in ('del', 'delete', 'remove', 'td'):
+        if len(sys.argv) < 3:
+            print(Style.paint("❌ Erro: Informe o número da tarefa.", Style.RED))
+            sys.exit(1)
+        try:
+            idx = int(sys.argv[2])
+            delete_todo(idx)
+        except ValueError:
+            print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
+            
+    elif command in ('note', 'n', 'journal', 'j'):
+        if len(sys.argv) < 3:
+            # Se chamou sem texto, exibe as notas do jornal de hoje
+            list_today_journal()
+        else:
+            add_journal_note(" ".join(sys.argv[2:]))
+            
+    elif command in ('view', 'today'):
+        list_today_journal()
+        
+    elif command in ('report', 'r', 'stats'):
+        simple_mode = False
+        if len(sys.argv) > 2:
+            flags = [arg.lower() for arg in sys.argv[2:]]
+            if '--simple' in flags or '-s' in flags:
+                simple_mode = True
+        generate_report(simple_mode)
+        
+    else:
+        # Se for um comando não reconhecido, mas o usuário digitou uma frase longa,
+        # pode ser que ele queira adicionar uma tarefa ou nota de forma direta?
+        # É mais seguro avisar que o comando não existe e sugerir a ajuda.
+        print(Style.paint(f"❌ Comando desconhecido: '{command}'", Style.RED))
+        print(Style.paint("Use 'taskzito' sem argumentos para ver o dashboard e ajuda.", Style.MUTED))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
