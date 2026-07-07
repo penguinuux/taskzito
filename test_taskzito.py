@@ -164,7 +164,7 @@ class TestTaskzito(unittest.TestCase):
         with open(TEST_JOURNAL_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
             
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = datetime.now().strftime("%d/%m/%Y")
         
         # Verifica cabeçalho de data
         self.assertIn(f"# {today_str}", content)
@@ -206,11 +206,11 @@ class TestTaskzito(unittest.TestCase):
         """Testa a extração e agrupamento de hashtags #Task e #Bug do diário."""
         # Cria um arquivo de jornal falso contendo datas e tags variadas
         fake_journal_content = (
-            "# 2026-07-06\n"
+            "# 06/07/2026\n"
             "- [10:00:00] Iniciei o dia com #Task4001\n"
             "- [11:30:00] Resolvendo exception na controller #Bug505 e #Task4001\n"
             "\n"
-            "# 2026-07-07\n"
+            "# 07/07/2026\n"
             "- [14:00:00] Planejando nova sprint #Task9002\n"
         )
         with open(TEST_JOURNAL_FILE, 'w', encoding='utf-8') as f:
@@ -218,24 +218,24 @@ class TestTaskzito(unittest.TestCase):
             
         report_data = taskzito.parse_journal_for_report()
         
-        # Validação do Dia 2026-07-06
-        self.assertIn("2026-07-06", report_data)
-        self.assertIn("#Task4001", report_data["2026-07-06"])
-        self.assertIn("#Bug505", report_data["2026-07-06"])
+        # Validação do Dia 06/07/2026
+        self.assertIn("06/07/2026", report_data)
+        self.assertIn("#Task4001", report_data["06/07/2026"])
+        self.assertIn("#Bug505", report_data["06/07/2026"])
         
         # Verifica o número de ocorrências por tag
-        self.assertEqual(len(report_data["2026-07-06"]["#Task4001"]), 2)
-        self.assertEqual(len(report_data["2026-07-06"]["#Bug505"]), 1)
+        self.assertEqual(len(report_data["06/07/2026"]["#Task4001"]), 2)
+        self.assertEqual(len(report_data["06/07/2026"]["#Bug505"]), 1)
         
-        # Validação do Dia 2026-07-07
-        self.assertIn("2026-07-07", report_data)
-        self.assertIn("#Task9002", report_data["2026-07-07"])
-        self.assertEqual(len(report_data["2026-07-07"]["#Task9002"]), 1)
+        # Validação do Dia 07/07/2026
+        self.assertIn("07/07/2026", report_data)
+        self.assertIn("#Task9002", report_data["07/07/2026"])
+        self.assertEqual(len(report_data["07/07/2026"]["#Task9002"]), 1)
 
     def test_generate_report_simple_output(self):
         """Testa se o relatório no modo simples (-s / --simple) gera a saída esperada."""
         fake_journal_content = (
-            "# 2026-07-07\n"
+            "# 07/07/2026\n"
             "- [09:00:00] Correção de css #Bug12\n"
             "- [10:30:00] Implementado novas views #Task99\n"
             "- [11:00:00] Teste unitário das views #Task99 #Bug12\n"
@@ -252,7 +252,7 @@ class TestTaskzito(unittest.TestCase):
         finally:
             sys.stdout = sys.__stdout__  # Restaura o stdout original
             
-        expected_output = "2026-07-07: #Task99, #Bug12\n"
+        expected_output = "07/07/2026: #Task99, #Bug12\n"
         self.assertEqual(captured_output.getvalue(), expected_output)
 
 

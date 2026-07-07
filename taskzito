@@ -237,7 +237,7 @@ def add_journal_note(note_text):
         sys.exit(1)
         
     now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
+    today_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M:%S")
     
     note_content = note_text.strip()
@@ -262,7 +262,7 @@ def add_journal_note(note_text):
         # Se o header de hoje já existe, apenas adicionamos a nota no final do dia
         # Para evitar problemas se o usuário adicionar notas antigas de forma manual,
         # vamos verificar se a última ocorrência de `# YYYY-MM-DD` é de hoje.
-        headers = re.findall(r'^#\s+(\d{4}-\d{2}-\d{2})', content, re.MULTILINE)
+        headers = re.findall(r'^#\s+(\d{2}/\d{2}/\d{4})', content, re.MULTILINE)
         
         if headers and headers[-1] == today_str:
             # O dia atual é o último do jornal. Apenas anexamos
@@ -307,13 +307,13 @@ def parse_today_journal():
     with open(JOURNAL_FILE, 'r', encoding='utf-8') as f:
         lines = f.read().splitlines()
         
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%d/%m/%Y")
     in_today_section = False
     notes = []
     
     for idx, line in enumerate(lines):
         if line.strip().startswith('# '):
-            date_match = re.match(r'^#\s+(\d{4}-\d{2}-\d{2})', line.strip())
+            date_match = re.match(r'^#\s+(\d{2}/\d{2}/\d{4})', line.strip())
             if date_match:
                 current_date = date_match.group(1)
                 in_today_section = (current_date == today_str)
@@ -399,7 +399,7 @@ def delete_journal_note(index_to_delete):
 def list_today_journal():
     """Mostra as notas inseridas hoje no journal com índices."""
     now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
+    today_str = now.strftime("%d/%m/%Y")
     
     print(Style.paint(f"\n📖 {Style.BOLD}NOTAS DO DIÁRIO DE HOJE ({today_str}){Style.RESET}", Style.CYAN))
     print(Style.paint("─" * 50, Style.MUTED))
@@ -445,7 +445,7 @@ def parse_journal_for_report():
     
     # Divide o arquivo em seções por dia
     # Cada seção começa com um cabeçalho `# YYYY-MM-DD`
-    day_sections = re.split(r'^#\s+(\d{4}-\d{2}-\d{2})', content, flags=re.MULTILINE)
+    day_sections = re.split(r'^#\s+(\d{2}/\d{2}/\d{4})', content, flags=re.MULTILINE)
     
     # O primeiro elemento é o que vem antes do primeiro header (normalmente vazio ou cabeçalho do arquivo)
     # Depois, os elementos vêm em pares: (data, texto da seção)
@@ -498,7 +498,7 @@ def generate_report(simple=False):
             print(Style.paint("═" * 60, Style.CYAN))
         return
         
-    sorted_dates = sorted(report_data.keys())
+    sorted_dates = sorted(report_data.keys(), key=lambda d: datetime.strptime(d, "%d/%m/%Y"))
     
     if simple:
         for date_str in sorted_dates:
@@ -591,7 +591,7 @@ def show_dashboard():
     
     # 2. Resumo do Diário de Hoje
     print(Style.paint(f"  {ICON_JOURNAL} Journal de Hoje:", Style.WHITE, bold=True))
-    today_str = now.strftime("%Y-%m-%d")
+    today_str = now.strftime("%d/%m/%Y")
     
     has_journal_today = False
     if os.path.exists(JOURNAL_FILE):
