@@ -13,19 +13,22 @@ from io import StringIO
 # ==============================================================================
 from importlib.machinery import SourceFileLoader
 
-script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'taskzito'))
+# Define variáveis de ambiente de teste para os caminhos de dados.
+# Isso garante que, mesmo durante a execução de nível de módulo (tempo de importação),
+# o script aponte para os arquivos de teste e não toque nos dados reais do usuário.
+script_dir = os.path.abspath(os.path.dirname(__file__))
+TEST_TODO_FILE = os.path.join(script_dir, "todo_test.d")
+TEST_JOURNAL_FILE = os.path.join(script_dir, "journal_test.md")
+
+os.environ["TASKZITO_TODO_FILE"] = TEST_TODO_FILE
+os.environ["TASKZITO_JOURNAL_FILE"] = TEST_JOURNAL_FILE
+
+script_path = os.path.join(script_dir, 'taskzito')
 loader = SourceFileLoader("taskzito", script_path)
 spec = importlib.util.spec_from_file_location("taskzito", loader=loader)
 taskzito = importlib.util.module_from_spec(spec)
 sys.modules["taskzito"] = taskzito
 spec.loader.exec_module(taskzito)
-
-# Redireciona os arquivos de dados para arquivos de testes isolados
-TEST_TODO_FILE = os.path.join(taskzito.SCRIPT_DIR, "todo_test.d")
-TEST_JOURNAL_FILE = os.path.join(taskzito.SCRIPT_DIR, "journal_test.md")
-
-taskzito.TODO_FILE = TEST_TODO_FILE
-taskzito.JOURNAL_FILE = TEST_JOURNAL_FILE
 
 
 class TestTaskzito(unittest.TestCase):

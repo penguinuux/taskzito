@@ -46,8 +46,8 @@ ICON_BULLET = "▪"
 # Resolve o diretório real do script (mesmo quando chamado por link simbólico)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-TODO_FILE = os.path.join(SCRIPT_DIR, "todo.d")
-JOURNAL_FILE = os.path.join(SCRIPT_DIR, "journal.md")
+TODO_FILE = os.getenv("TASKZITO_TODO_FILE", os.path.join(SCRIPT_DIR, "todo.d"))
+JOURNAL_FILE = os.getenv("TASKZITO_JOURNAL_FILE", os.path.join(SCRIPT_DIR, "journal.md"))
 
 def ensure_files_exist():
     """Garante que os arquivos de dados (todo.d e journal.md) existam."""

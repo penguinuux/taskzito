@@ -116,3 +116,5 @@ Você pode validar e garantir a integridade de todas as regras de negócio execu
 ```bash
 python3 test_taskzito.py
 ```
+
+*(Nota: Os testes rodam de forma 100% isolada usando variáveis de ambiente e arquivos temporários de teste, sem alterar ou apagar dados reais de tarefas e diário)*.
