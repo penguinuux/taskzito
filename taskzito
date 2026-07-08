@@ -370,9 +370,15 @@ def parse_today_journal():
     for idx, line in enumerate(lines):
         if line.strip().startswith('# '):
             date_match = re.match(r'^#\s+(\d{2}/\d{2}/\d{4})', line.strip())
+            date_match_iso = re.match(r'^#\s+(\d{4}-\d{2}-\d{2})', line.strip())
+            
             if date_match:
                 current_date = date_match.group(1)
                 in_today_section = (current_date == today_str)
+            elif date_match_iso:
+                current_iso = date_match_iso.group(1)
+                today_iso = datetime.now().strftime("%Y-%m-%d")
+                in_today_section = (current_iso == today_iso)
             else:
                 in_today_section = False
             continue
@@ -550,7 +556,16 @@ def parse_journal_for_report():
             if date_match:
                 current_date = date_match.group(1)
             else:
-                current_date = None
+                date_match_iso = re.match(r'^#\s+(\d{4}-\d{2}-\d{2})', line.strip())
+                if date_match_iso:
+                    iso_date = date_match_iso.group(1)
+                    try:
+                        current_date = datetime.strptime(iso_date, "%Y-%m-%d").strftime("%d/%m/%Y")
+                    except ValueError:
+                        current_date = None
+                else:
+                    current_date = None
+                    
             current_notes = []
             continue
             
