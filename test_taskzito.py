@@ -307,6 +307,32 @@ class TestTaskzito(unittest.TestCase):
         notes = taskzito.parse_today_journal()
         self.assertEqual(notes[0]['text'], "Nota editada interativa")
 
+    @patch('subprocess.call', return_value=0)
+    def test_edit_journal_note_with_system_editor(self, mock_subproc):
+        """Testa se a nota é editada com o editor do sistema Mockado."""
+        taskzito.ensure_files_exist()
+        taskzito.add_journal_note("Nota Original")
+        
+        # Simula o editor escrevendo no arquivo temporário antes de fechar (retornar 0)
+        def side_effect_mock_editor(args):
+            temp_file_path = args[1]
+            with open(temp_file_path, 'w', encoding='utf-8') as f:
+                f.write("Nota editada pelo editor externo com #Bug900")
+            return 0
+            
+        mock_subproc.side_effect = side_effect_mock_editor
+        
+        taskzito.edit_journal_note(1, use_editor=True)
+        
+        # O subprocess deve ter sido chamado com o editor e o caminho do arquivo
+        mock_subproc.assert_called_once()
+        
+        # O diário deve conter a nova nota atualizada
+        notes = taskzito.parse_today_journal()
+        self.assertEqual(notes[0]['text'], "Nota editada pelo editor externo com #Bug900")
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

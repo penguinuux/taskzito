@@ -3,6 +3,8 @@ import os
 import sys
 import re
 from datetime import datetime
+import subprocess
+import tempfile
 
 # ==============================================================================
 # DESIGN SYSTEM & COLOR PALETTE
@@ -78,6 +80,30 @@ def input_with_default(prompt, default_text):
             readline.set_startup_hook()
         except ImportError:
             pass
+
+def edit_with_system_editor(initial_content):
+    """
+    Salva initial_content em um arquivo temporário e abre o editor preferido do sistema.
+    Retorna o novo conteúdo editado do arquivo.
+    """
+    editor = os.getenv('VISUAL') or os.getenv('EDITOR') or 'nano'
+    
+    with tempfile.NamedTemporaryFile(suffix=".md", delete=False, mode='w', encoding='utf-8') as tf:
+        tf.write(initial_content)
+        temp_path = tf.name
+        
+    try:
+        return_code = subprocess.call([editor, temp_path])
+        if return_code != 0:
+            print(Style.paint(f"❌ Erro: O editor retornou código de status {return_code}.", Style.RED))
+            sys.exit(1)
+            
+        with open(temp_path, 'r', encoding='utf-8') as tf:
+            new_content = tf.read()
+        return new_content
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 # ==============================================================================
@@ -367,7 +393,7 @@ def parse_today_journal():
                     notes[-1]['original_lines'].append(line)
     return notes
 
-def edit_journal_note(index_to_edit, new_text=None):
+def edit_journal_note(index_to_edit, new_text=None, use_editor=False):
     """Edita uma nota do diário de hoje pelo índice de exibição."""
     if not os.path.exists(JOURNAL_FILE):
         print(Style.paint("❌ Erro: Nenhum jornal encontrado.", Style.RED))
@@ -384,8 +410,11 @@ def edit_journal_note(index_to_edit, new_text=None):
         
     target_note = notes[index_to_edit - 1]
     
+    # Se use_editor for True, abre o editor de texto do sistema
+    if use_editor:
+        new_text = edit_with_system_editor(target_note['text'])
     # Modo interativo se o novo texto não for fornecido na linha de comando
-    if new_text is None:
+    elif new_text is None:
         prompt = Style.paint(f"✍️  Editar nota {index_to_edit} (Enter para confirmar): ", Style.CYAN)
         new_text = input_with_default(prompt, target_note['text'])
         
@@ -807,8 +836,14 @@ def main():
                     sys.exit(1)
                 try:
                     idx = int(sys.argv[3])
-                    new_text = " ".join(sys.argv[4:]) if len(sys.argv) > 4 else None
-                    edit_journal_note(idx, new_text)
+                    remaining_args = sys.argv[4:]
+                    use_editor = '--editor' in remaining_args or '-e' in remaining_args
+                    
+                    if use_editor:
+                        edit_journal_note(idx, new_text=None, use_editor=True)
+                    else:
+                        new_text = " ".join(remaining_args) if remaining_args else None
+                        edit_journal_note(idx, new_text, use_editor=False)
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             elif sub in ('del', 'delete', 'remove'):
