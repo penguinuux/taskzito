@@ -283,8 +283,11 @@ def edit_todo(index_to_edit, new_text=None):
 # ==============================================================================
 # HELPERS PARA JOURNAL (journal.md)
 # ==============================================================================
-def add_journal_note(note_text):
+def add_journal_note(note_text, use_editor=False):
     """Anexa uma nota de texto temporal com timestamp no dia atual."""
+    if use_editor:
+        note_text = edit_with_system_editor(note_text)
+        
     if not note_text.strip():
         print(Style.paint("❌ Erro: A nota não pode estar vazia.", Style.RED))
         sys.exit(1)
@@ -856,7 +859,14 @@ def main():
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             else:
-                add_journal_note(" ".join(sys.argv[2:]))
+                remaining_args = sys.argv[2:]
+                use_editor = '-e' in remaining_args or '--editor' in remaining_args
+                if use_editor:
+                    initial_args = [arg for arg in remaining_args if arg not in ('-e', '--editor')]
+                    initial_text = " ".join(initial_args) if initial_args else ""
+                    add_journal_note(initial_text, use_editor=True)
+                else:
+                    add_journal_note(" ".join(remaining_args), use_editor=False)
         else:
             list_today_journal()
             
