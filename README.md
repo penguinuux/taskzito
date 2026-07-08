@@ -63,7 +63,7 @@ O **Taskzito** é um jornal markdown minimalista e gerenciador de to-do list CLI
 *   **Editar uma nota registrada hoje**:
     ```bash
     ./taskzito note edit <numero_da_nota> "Novo texto da nota"
-    # ou, para abrir no editor de texto padrão do sistema (vim, nano, emacs):
+    # ou, para abrir no editor de texto padrão do sistema (vi, vim, emacs):
     ./taskzito note edit <numero_da_nota> -e  # ou --editor
     ```
     *(Dica: Se você omitir o novo texto e chamar apenas `./taskzito note edit <id>`, a CLI iniciará um prompt interativo no terminal pré-preenchido com a nota atual. Caso queira usar o editor padrão de tela cheia do sistema, passe a flag `-e` ou `--editor` que lê as variáveis de ambiente `VISUAL` ou `EDITOR` do shell).*

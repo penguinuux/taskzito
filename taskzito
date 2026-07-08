@@ -86,7 +86,7 @@ def edit_with_system_editor(initial_content):
     Salva initial_content em um arquivo temporário e abre o editor preferido do sistema.
     Retorna o novo conteúdo editado do arquivo.
     """
-    editor = os.getenv('VISUAL') or os.getenv('EDITOR') or 'nano'
+    editor = os.getenv('VISUAL') or os.getenv('EDITOR') or 'vi'
     
     with tempfile.NamedTemporaryFile(suffix=".md", delete=False, mode='w', encoding='utf-8') as tf:
         tf.write(initial_content)
