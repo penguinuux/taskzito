@@ -58,6 +58,27 @@ def ensure_files_exist():
         with open(JOURNAL_FILE, 'w', encoding='utf-8') as f:
             f.write("")
 
+def input_with_default(prompt, default_text):
+    """
+    Exibe um input interativo no terminal pré-preenchido com default_text.
+    Substitui quebras de linha por \\n literais para facilitar a edição em linha única.
+    """
+    try:
+        import readline
+        readline.set_startup_hook(lambda: readline.insert_text(default_text.replace('\n', '\\n')))
+    except ImportError:
+        pass
+        
+    try:
+        response = input(prompt)
+        return response.replace('\\n', '\n')
+    finally:
+        try:
+            import readline
+            readline.set_startup_hook()
+        except ImportError:
+            pass
+
 
 # ==============================================================================
 # HELPERS PARA TODO LIST (todo.d)
@@ -196,12 +217,8 @@ def delete_todo(index_to_delete):
     print(Style.paint(f"🗑️  Tarefa {index_to_delete} removida do seu todo!", Style.RED))
     print(f"   {Style.paint(removed_text, Style.MUTED, strike=True)}")
 
-def edit_todo(index_to_edit, new_text):
+def edit_todo(index_to_edit, new_text=None):
     """Edita o texto de uma tarefa mantendo seu status e marcador original."""
-    if not new_text.strip():
-        print(Style.paint("❌ Erro: O texto da tarefa não pode ser vazio.", Style.RED))
-        sys.exit(1)
-        
     lines = read_todo_file()
     todos = parse_todos(lines)
     
@@ -210,6 +227,16 @@ def edit_todo(index_to_edit, new_text):
         sys.exit(1)
         
     target_todo = todos[index_to_edit - 1]
+    
+    # Modo interativo se o novo texto não for fornecido na linha de comando
+    if new_text is None:
+        prompt = Style.paint(f"✍️  Editar tarefa {index_to_edit} (Enter para confirmar): ", Style.CYAN)
+        new_text = input_with_default(prompt, target_todo['text'])
+        
+    if not new_text.strip():
+        print(Style.paint("❌ Erro: O texto da tarefa não pode ser vazio.", Style.RED))
+        sys.exit(1)
+        
     line_idx = target_todo['line_idx']
     marker = target_todo['marker']
     status_char = 'x' if target_todo['done'] else ' '
@@ -340,12 +367,8 @@ def parse_today_journal():
                     notes[-1]['original_lines'].append(line)
     return notes
 
-def edit_journal_note(index_to_edit, new_text):
+def edit_journal_note(index_to_edit, new_text=None):
     """Edita uma nota do diário de hoje pelo índice de exibição."""
-    if not new_text.strip():
-        print(Style.paint("❌ Erro: O texto da nota não pode estar vazio.", Style.RED))
-        sys.exit(1)
-        
     if not os.path.exists(JOURNAL_FILE):
         print(Style.paint("❌ Erro: Nenhum jornal encontrado.", Style.RED))
         sys.exit(1)
@@ -360,6 +383,16 @@ def edit_journal_note(index_to_edit, new_text):
         sys.exit(1)
         
     target_note = notes[index_to_edit - 1]
+    
+    # Modo interativo se o novo texto não for fornecido na linha de comando
+    if new_text is None:
+        prompt = Style.paint(f"✍️  Editar nota {index_to_edit} (Enter para confirmar): ", Style.CYAN)
+        new_text = input_with_default(prompt, target_note['text'])
+        
+    if not new_text.strip():
+        print(Style.paint("❌ Erro: O texto da nota não pode estar vazio.", Style.RED))
+        sys.exit(1)
+        
     time_str = target_note['time']
     
     original_first_line = target_note['original_lines'][0]
@@ -704,12 +737,13 @@ def main():
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             elif sub == 'edit':
-                if len(sys.argv) < 5:
-                    print(Style.paint("❌ Erro: Especifique o índice e o novo texto da tarefa.", Style.RED))
+                if len(sys.argv) < 4:
+                    print(Style.paint("❌ Erro: Especifique o índice da tarefa para editar.", Style.RED))
                     sys.exit(1)
                 try:
                     idx = int(sys.argv[3])
-                    edit_todo(idx, " ".join(sys.argv[4:]))
+                    new_text = " ".join(sys.argv[4:]) if len(sys.argv) > 4 else None
+                    edit_todo(idx, new_text)
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             elif sub in ('del', 'delete', 'remove'):
@@ -734,12 +768,13 @@ def main():
         add_todo(" ".join(sys.argv[2:]))
         
     elif command == 'edit':
-        if len(sys.argv) < 4:
-            print(Style.paint("❌ Erro: Informe o número da tarefa e o novo texto.", Style.RED))
+        if len(sys.argv) < 3:
+            print(Style.paint("❌ Erro: Informe o número da tarefa para editar.", Style.RED))
             sys.exit(1)
         try:
             idx = int(sys.argv[2])
-            edit_todo(idx, " ".join(sys.argv[3:]))
+            new_text = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else None
+            edit_todo(idx, new_text)
         except ValueError:
             print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
 
@@ -767,12 +802,13 @@ def main():
         if len(sys.argv) > 2:
             sub = sys.argv[2].lower()
             if sub == 'edit':
-                if len(sys.argv) < 5:
-                    print(Style.paint("❌ Erro: Especifique o índice e o novo texto da nota.", Style.RED))
+                if len(sys.argv) < 4:
+                    print(Style.paint("❌ Erro: Especifique o índice da nota para editar.", Style.RED))
                     sys.exit(1)
                 try:
                     idx = int(sys.argv[3])
-                    edit_journal_note(idx, " ".join(sys.argv[4:]))
+                    new_text = " ".join(sys.argv[4:]) if len(sys.argv) > 4 else None
+                    edit_journal_note(idx, new_text)
                 except ValueError:
                     print(Style.paint("❌ Erro: O índice deve ser um número inteiro.", Style.RED))
             elif sub in ('del', 'delete', 'remove'):

@@ -7,6 +7,7 @@ import shutil
 import re
 from datetime import datetime
 from io import StringIO
+from unittest.mock import patch
 
 # ==============================================================================
 # CARREGAMENTO DINÂMICO DO SCRIPT 'taskzito' SEM EXTENSÃO .py
@@ -273,6 +274,38 @@ class TestTaskzito(unittest.TestCase):
         self.assertIn(today_str, report_data)
         self.assertIn("#Task99", report_data[today_str])
         self.assertEqual(report_data[today_str]["#Task99"][0][1], "Primeira linha\nSegunda linha com #Task99\nTerceira linha")
+
+    @patch('builtins.input', return_value="Minha tarefa editada interativa")
+    def test_interactive_edit_todo(self, mock_input):
+        """Testa a edição de tarefas no modo interativo (sem passar texto na CLI)."""
+        taskzito.ensure_files_exist()
+        taskzito.add_todo("Tarefa Antiga")
+        
+        # Chama a edição sem passar new_text (será None)
+        taskzito.edit_todo(1)
+        
+        # Verifica se o input foi chamado
+        mock_input.assert_called_once()
+        
+        # Verifica o resultado
+        todos = taskzito.parse_todos(taskzito.read_todo_file())
+        self.assertEqual(todos[0]['text'], "Minha tarefa editada interativa")
+
+    @patch('builtins.input', return_value="Nota editada interativa")
+    def test_interactive_edit_journal_note(self, mock_input):
+        """Testa a edição de notas no modo interativo (sem passar texto na CLI)."""
+        taskzito.ensure_files_exist()
+        taskzito.add_journal_note("Nota Antiga")
+        
+        # Chama a edição sem passar new_text (será None)
+        taskzito.edit_journal_note(1)
+        
+        # Verifica se o input foi chamado
+        mock_input.assert_called_once()
+        
+        # Verifica o resultado
+        notes = taskzito.parse_today_journal()
+        self.assertEqual(notes[0]['text'], "Nota editada interativa")
 
 
 if __name__ == "__main__":
