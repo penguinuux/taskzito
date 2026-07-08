@@ -255,6 +255,25 @@ class TestTaskzito(unittest.TestCase):
         expected_output = "07/07/2026: #Task99, #Bug12\n"
         self.assertEqual(captured_output.getvalue(), expected_output)
 
+    def test_add_and_parse_multiline_journal_note(self):
+        """Testa se notas multilinhas (usando \n ou quebras reais) são processadas e listadas corretamente."""
+        taskzito.ensure_files_exist()
+        
+        # Adiciona nota com quebras de linha usando \n string
+        taskzito.add_journal_note("Primeira linha\\nSegunda linha com #Task99\\nTerceira linha")
+        
+        notes = taskzito.parse_today_journal()
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]['text'], "Primeira linha\nSegunda linha com #Task99\nTerceira linha")
+        
+        # Verifica se o parser do relatório encontrou a tag no meio do texto multilinha
+        report_data = taskzito.parse_journal_for_report()
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        
+        self.assertIn(today_str, report_data)
+        self.assertIn("#Task99", report_data[today_str])
+        self.assertEqual(report_data[today_str]["#Task99"][0][1], "Primeira linha\nSegunda linha com #Task99\nTerceira linha")
+
 
 if __name__ == "__main__":
     unittest.main()

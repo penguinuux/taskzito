@@ -50,7 +50,12 @@ O **Taskzito** é um jornal markdown minimalista e gerenciador de to-do list CLI
     ```bash
     ./taskzito note "Implementando a rota de login #Task42282"
     ```
-*   **Visualizar as notas do diário registradas hoje (com índices)**:
+*   **Adicionar uma nota multilinha**:
+    Você pode passar quebras de linha reais no terminal abrindo aspas ou utilizar a sequência `\n`:
+    ```bash
+    ./taskzito note "Primeira linha da nota\nSegunda linha da nota com #Task123"
+    ```
+*   **Visualizar as notas do diário registradas hoje (com índices e formatação multilinha)**:
     ```bash
     ./taskzito view
     ```
